@@ -1,0 +1,331 @@
+openapi: 3.0.0
+info:
+  version: 1.0.0
+  title: BookIT API
+  description: A REST API to manage bookings at a fictionary university.
+  
+servers:
+  - url: https://bookIT.com/v1
+
+components:
+  schemas:
+    Room:
+      type: object
+      required:
+        - roomNumber
+      properties:
+        roomDescription:
+          description: "The description of the room, e.g. Lecture theatre"
+          type: string
+        maxCapacity:
+          description: "Maximum capacity of room"
+          type: integer
+        plan:
+          description: "The level the room is on, e.g. 1"
+          type: integer
+        corridor:
+          description: "The corridor the room is on, e.g. A"
+          type: string
+        roomNumber:
+          description: "The full room number, e.g. A114"
+          type: string
+        availability:
+          description: "If a room is unavailable or not"
+          type: string
+          enum: [available, unavailable]
+  
+    Booking:
+      type: object
+      required:
+        - bookingId
+        - roomNumber
+      properties:
+        bookingId:
+          description: "A unique identifier for a booking"
+          type: string
+        roomNumber:
+          description: "Room that the booking relates to"
+          type: string
+        startTime:
+          description: "Start time of the reservation"
+          type: string
+          format: date-time
+        endTime:
+          description: "End time of the reservation"
+          type: string
+          format: date-time
+        booker:
+          description: "Name of the person who booked the room"
+          type: string
+        reason:
+          description: "The description of the reason using the room"
+          type: string
+        expectedMaxCapacity:
+          description: "Expected max number of people to use the room in this booking"
+          type: integer
+          
+  parameters:
+    RoomFloor:  
+      in: query
+      name: floor
+      description: Returns a list of available or booked rooms
+      schema:
+        type: integer
+    
+    RoomAvailabilty:  
+      in: query
+      name: availability
+      description: Specifies if a room is available or booked
+      schema:
+        type: string
+        enum: [available, booked]
+        
+    RoomNumber:
+      in: path
+      name: roomNumber
+      required: true
+      schema:
+        type: string
+        
+             
+    BookingId:
+      in: path
+      name: bookingId
+      required: true
+      schema:
+        type: string
+        
+    StartTime:
+      in: query
+      name: startTime
+      schema:
+        type: string
+        
+    EndTime:
+      in: query
+      name: endTime
+      schema:
+        type: string   
+          
+  responses:
+    400Error:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+  
+  links:
+    GetRoomByRoomNumber:
+      description: >
+        The `id` value returned in the response can be used as
+        the `RoomNumber` parameter in `GET /Room/{RoomNumber}`.
+      operationId: getRoom
+      parameters:
+        roomNumber: '$response.body#/id'
+    
+    GetBookingByBookingId:
+      description: >
+        The `id` value returned in the response can be used as
+        the `BookingId` parameter in `GET /bookings/{BookingId}`.
+      operationId: getBooking
+      parameters:
+        bookingId: '$response.body#/id'
+      
+      
+
+paths:
+  /rooms:
+  #1
+    post:
+      description: Lets an admin create a new room
+      operationId: createRoom
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Room'
+      responses:
+        '201':
+          description: New room successfully created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    description: Room number of the created room
+          links:
+            GetRoomByRoomNumber:
+              $ref: '#/components/links/GetRoomByRoomNumber' 
+        '400':
+          $ref: '#/components/responses/400Error'
+        '409':
+          description: A room with that room number already exists
+    #2, #3, #4
+    get:
+      parameters:
+      - $ref: '#/components/parameters/RoomAvailabilty'
+      - $ref: '#/components/parameters/RoomFloor'
+      description: Returns a list of all rooms with the option of checking availabilty and/or floor
+      responses:
+        '200':
+          description: Successfully returned a list of rooms 
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                 $ref: '#/components/schemas/Room'
+        '400':
+          $ref: '#/components/responses/400Error'
+        '404':
+          description: Rooms not found
+
+  
+  /rooms/{roomNumber}:
+    parameters:
+    - $ref: '#/components/parameters/RoomNumber'
+    #1
+    delete:
+      description: Lets an admin delete a room
+      operationId: deleteRoom
+      responses:
+        '200':
+          description: A room was successfully deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Room'
+          links:
+            GetRoomByRoomNumber:
+              $ref: '#/components/links/GetRoomByRoomNumber'
+        '400':
+          $ref: '#/components/responses/400Error'
+        '404':
+          description: The specific room was not found
+    #1
+    put:
+      description: Lets an admin change a specific room
+      operationId: updateRoom
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Room'
+      responses:
+       '200':
+          description: A room is successfully changed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Room'
+          links:
+            GetRoomByRoomNumber:
+              $ref: '#/components/links/GetRoomByRoomNumber'
+       '404':
+          description: The specific room was not found
+  
+  /rooms/{roomNumber}/bookings/:
+    parameters:
+    - $ref: '#/components/parameters/RoomNumber' 
+    - $ref: '#/components/parameters/StartTime' 
+    - $ref: '#/components/parameters/EndTime' 
+    
+    #5
+    get:
+      description: Returns the booking status of a specific room
+      operationId: roomStatus
+      responses:
+        '200':
+          description: Successfully returned the status of the specific room
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Room/properties/availability'
+          links:
+            GetRoomByRoomNumber:
+              $ref: '#/components/links/GetRoomByRoomNumber'
+        '400':
+          $ref: '#/components/responses/400Error'
+        '404':
+          description: Room not found
+    
+    #6
+    post:
+      description: Lets a staff member request a room booking at a specific time
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Booking'
+      responses:
+        '201':
+          description: Successfully created a new room booking
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    description: Booking id of the created room
+          links:
+            GetBookingByBookingId:
+              $ref: '#/components/links/GetBookingByBookingId' 
+        '400':
+          $ref: '#/components/responses/400Error'
+        '409':
+          description: The room is already booked for that time      
+          
+  /rooms/{roomNumber}/bookings/{bookingId}:
+    parameters:
+      - $ref: '#/components/parameters/RoomNumber' 
+      - $ref: '#/components/parameters/BookingId' 
+      
+    #7
+    put:
+      description: Update a booking by room number and booking id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Booking'
+      responses:
+        '200':
+          description: Booking updated
+          links:
+            GetRoomByRoomNumber:
+              $ref: '#/components/links/GetRoomByRoomNumber'
+            GetBookingByBookingId:
+              $ref: '#/components/links/GetBookingByBookingId' 
+        '400':
+          $ref: '#/components/responses/400Error'
+        '404':
+          description: Booking or room not found       
+
+    #8 
+    delete:
+      description: Lets a staff member remove their booking on a specific room
+      responses:
+        '200':
+          description: Booking of room removed
+          links:
+            GetRoomByRoomNumber:
+              $ref: '#/components/links/GetRoomByRoomNumber'
+            GetBookingByBookingId:
+              $ref: '#/components/links/GetBookingByBookingId' 
+        '400':
+          $ref: '#/components/responses/400Error'
+        '404':
+          description: Booking or room not found  
+     
+
